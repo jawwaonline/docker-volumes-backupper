@@ -54,3 +54,16 @@ Wann solltest du das nutzen? Nur, wenn deine Zielfestplatte (z.B. am Raspberry P
 ```Bash
 docker exec -it docker-volumes-backupper /usr/local/bin/backup-run.sh
 ```
+
+### 🔔 Benachrichtigungen (ntfy)
+
+Optional kannst du Status-Berichte an einen [ntfy](https://ntfy.sh) Server senden.
+
+```yaml
+environment:
+  # ... rsync settings ...
+  NOTIFY_TOPIC: "mein_geheimes_backup_topic"
+  NOTIFY_URL: "[https://ntfy.sh](https://ntfy.sh)" # Optional, default ist ntfy.sh
+  NOTIFY_USERNAME: "user" # Optional
+  NOTIFY_PASSWORD: "pass" # Optional
+```
