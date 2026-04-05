@@ -61,9 +61,7 @@ Optional kannst du Status-Berichte an einen [ntfy](https://ntfy.sh) Server sende
 
 ```yaml
 environment:
-  # ... rsync settings ...
-  NOTIFY_TOPIC: "mein_geheimes_backup_topic"
-  NOTIFY_URL: "[https://ntfy.sh](https://ntfy.sh)" # Optional, default ist ntfy.sh
+  NOTIFY_URL: "https://ntfy.sh/mein_topic"
   NOTIFY_USERNAME: "user" # Optional
   NOTIFY_PASSWORD: "pass" # Optional
 ```
