@@ -27,6 +27,20 @@ for p in $EXCLUDES; do
 done
 
 # ----------------------------
+# Transfer-Optionen
+# ----------------------------
+# Kompression ist per Default AUS: auf bereits komprimierten Daten (DBs,
+# Influx-.tsm, Videos) kostet -z am Ziel nur CPU und bremst. Bei langsamen
+# WAN-/Tailscale-Zielen per RSYNC_COMPRESS=1 wieder einschalten.
+COMPRESS_FLAG=""
+[ "${RSYNC_COMPRESS:-0}" = "1" ] && COMPRESS_FLAG="-z"
+
+# Harte Obergrenze fuer das Einfrieren der Container (Sekunden, 0 = aus).
+# Verhindert, dass ein haengender Final-Sync das ganze Haus lahmlegt.
+MAX_PAUSE_SECONDS="${MAX_PAUSE_SECONDS:-300}"
+PAUSE_GUARD_PID=""
+
+# ----------------------------
 # ntfy Sender
 # ----------------------------
 send_ntfy() {
@@ -62,6 +76,12 @@ send_ntfy() {
 cleanup_and_report() {
   echo ""
   echo "📊 Cleanup & Bericht..."
+
+  # Pause-Waechter beenden, bevor entlassen wird
+  if [ -n "$PAUSE_GUARD_PID" ]; then
+    kill "$PAUSE_GUARD_PID" 2>/dev/null || true
+    PAUSE_GUARD_PID=""
+  fi
 
   if [ -n "$PAUSED_CONTAINERS" ]; then
     echo "▶️ Unpause Container..."
@@ -99,7 +119,7 @@ trap cleanup_and_report EXIT
 # Backup starten
 # ----------------------------
 echo "🚀 Backup gestartet: $(date)"
-echo "🚫 Ausschluesse: ${EXCLUDES:-keine}"
+echo "🚫 Ausschluesse: ${EXCLUDES:-keine} | Kompression: ${COMPRESS_FLAG:-aus} | Pause-Limit: ${MAX_PAUSE_SECONDS}s"
 send_ntfy "Backup gestartet: $B_NAME" "Backup gestartet um $(date '+%H:%M:%S')" "hourglass"
 
 if [ -z "$REMOTE_IP" ]; then
@@ -138,7 +158,7 @@ fi
 echo "[3/4] Erster Sync..."
 STATUS_SYNC1="Fehlgeschlagen ❌"
 set +e
-sshpass -p "$REMOTE_PASS" rsync -avz --delete $EXCLUDE_ARGS \
+sshpass -p "$REMOTE_PASS" rsync -av $COMPRESS_FLAG --delete $EXCLUDE_ARGS \
   --rsync-path="sudo rsync" \
   -e "ssh -o StrictHostKeyChecking=accept-new" \
   /source_data/ "$REMOTE_USER@$REMOTE_IP:$REMOTE_PATH/"
@@ -163,10 +183,23 @@ TARGETS=$(docker ps --format "{{.Names}}" | grep -viE "docker-volumes-backupper|
 if [ -n "$TARGETS" ]; then
   docker pause $TARGETS
   PAUSED_CONTAINERS="$TARGETS"
+
+  # Sicherheitsnetz: Container nie laenger als MAX_PAUSE_SECONDS einfrieren,
+  # auch wenn der Final-Sync haengt. Der Waechter laeuft im Hintergrund und
+  # wird am Ende (cleanup_and_report) beendet.
+  if [ "$MAX_PAUSE_SECONDS" -gt 0 ] 2>/dev/null; then
+    (
+      sleep "$MAX_PAUSE_SECONDS"
+      echo "⏱️  Pause-Limit (${MAX_PAUSE_SECONDS}s) erreicht - Container werden entlassen"
+      docker unpause $PAUSED_CONTAINERS >/dev/null 2>&1 || true
+    ) &
+    PAUSE_GUARD_PID=$!
+    echo "⏱️  Pause-Waechter aktiv (max ${MAX_PAUSE_SECONDS}s)"
+  fi
 fi
 
 set +e
-sshpass -p "$REMOTE_PASS" rsync -avz --delete $EXCLUDE_ARGS \
+sshpass -p "$REMOTE_PASS" rsync -av $COMPRESS_FLAG --delete $EXCLUDE_ARGS \
   --rsync-path="sudo rsync" \
   -e "ssh -o StrictHostKeyChecking=accept-new" \
   /source_data/ "$REMOTE_USER@$REMOTE_IP:$REMOTE_PATH/"

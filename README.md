@@ -65,6 +65,28 @@ environment:
 Ausgeschlossene Pfade werden von `--delete` **nicht** auf dem Ziel gelöscht (rsync schützt sie),
 sie bleiben also liegen, bis man sie dort selbst entfernt.
 
+### ⏱️ Pause-Limit (`MAX_PAUSE_SECONDS`)
+
+Für den zweiten (finalen) Sync werden die anderen Container kurz pausiert. Damit ein hängender
+Sync nicht das ganze Haus einfriert, läuft ein Wächter mit, der sie nach `MAX_PAUSE_SECONDS`
+(Sekunden, Default **300**, `0` = aus) zwangsweise wieder entlässt:
+
+```yaml
+environment:
+  MAX_PAUSE_SECONDS: "300"
+```
+
+### 🗜️ Kompression (`RSYNC_COMPRESS`)
+
+`rsync -z` ist **standardmäßig aus**. Auf bereits komprimierten Daten (Datenbanken,
+Influx-`.tsm`, Videos) kostet die Kompression am Ziel nur CPU und bremst den Lauf.
+Bei langsamen WAN-/Tailscale-Zielen wieder anschalten:
+
+```yaml
+environment:
+  RSYNC_COMPRESS: "1"
+```
+
 ### 🧪 Manuelles Backup testen
 
 ```Bash
