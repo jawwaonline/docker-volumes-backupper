@@ -12,6 +12,21 @@ PAUSED_CONTAINERS=""
 B_NAME="${BACKUP_NAME:-$(hostname)}"
 
 # ----------------------------
+# Ausschluesse vom Backup
+# ----------------------------
+# Standard: Kamera-Aufnahmen (Frigate) NICHT mitsichern - rollierendes
+# Videomaterial sprengt jedes Ziel und ist im _old-Snapshot doppelt belegt.
+# Weitere Pfade per RSYNC_EXCLUDES ergaenzen (space-getrennt), z.B.
+#   RSYNC_EXCLUDES="frigate/media/ influx/data/data/altafulla/autogen"
+# Leer setzen (RSYNC_EXCLUDES="none"), um alles zu sichern.
+EXCLUDES="${RSYNC_EXCLUDES-frigate/media/}"
+[ "$EXCLUDES" = "none" ] && EXCLUDES=""
+EXCLUDE_ARGS=""
+for p in $EXCLUDES; do
+  EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$p"
+done
+
+# ----------------------------
 # ntfy Sender
 # ----------------------------
 send_ntfy() {
@@ -84,6 +99,7 @@ trap cleanup_and_report EXIT
 # Backup starten
 # ----------------------------
 echo "🚀 Backup gestartet: $(date)"
+echo "🚫 Ausschluesse: ${EXCLUDES:-keine}"
 send_ntfy "Backup gestartet: $B_NAME" "Backup gestartet um $(date '+%H:%M:%S')" "hourglass"
 
 if [ -z "$REMOTE_IP" ]; then
@@ -122,7 +138,7 @@ fi
 echo "[3/4] Erster Sync..."
 STATUS_SYNC1="Fehlgeschlagen ❌"
 set +e
-sshpass -p "$REMOTE_PASS" rsync -avz --delete \
+sshpass -p "$REMOTE_PASS" rsync -avz --delete $EXCLUDE_ARGS \
   --rsync-path="sudo rsync" \
   -e "ssh -o StrictHostKeyChecking=accept-new" \
   /source_data/ "$REMOTE_USER@$REMOTE_IP:$REMOTE_PATH/"
@@ -150,7 +166,7 @@ if [ -n "$TARGETS" ]; then
 fi
 
 set +e
-sshpass -p "$REMOTE_PASS" rsync -avz --delete \
+sshpass -p "$REMOTE_PASS" rsync -avz --delete $EXCLUDE_ARGS \
   --rsync-path="sudo rsync" \
   -e "ssh -o StrictHostKeyChecking=accept-new" \
   /source_data/ "$REMOTE_USER@$REMOTE_IP:$REMOTE_PATH/"

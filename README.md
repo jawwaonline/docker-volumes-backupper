@@ -49,6 +49,22 @@ INCREMENTAL: "false"
 Die Daten werden direkt und ohne doppelten Boden auf den Zielrechner gespiegelt.
 Wann solltest du das nutzen? Nur, wenn deine Zielfestplatte (z.B. am Raspberry Pi) im Windows-Format FAT32 oder exFAT formatiert ist. Diese Formate unterstützen keine Hardlinks, wodurch der Kopiervorgang fehlschlagen würde.
 
+### 🚫 Ausschluesse (`RSYNC_EXCLUDES`)
+
+Manche Verzeichnisse haben im Backup nichts verloren — allen voran rollierendes Videomaterial
+(Frigate-Aufnahmen): es sprengt das Ziel und liegt im `_old`-Snapshot zusätzlich als Hardlink.
+
+Standard ohne Angabe: **`frigate/media/`** wird nicht gesichert (`frigate/config` inkl.
+`frigate.db` schon). Weitere Pfade space-getrennt ergänzen, oder `none` für "alles sichern":
+
+```yaml
+environment:
+  RSYNC_EXCLUDES: "frigate/media/ influx/data/data/altafulla/autogen"
+```
+
+Ausgeschlossene Pfade werden von `--delete` **nicht** auf dem Ziel gelöscht (rsync schützt sie),
+sie bleiben also liegen, bis man sie dort selbst entfernt.
+
 ### 🧪 Manuelles Backup testen
 
 ```Bash
